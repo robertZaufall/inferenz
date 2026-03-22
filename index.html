@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KI-Benchmark: Inferenz-Engines im Vergleich</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-card: #1a1a26;
+    --bg-card-hover: #22222f;
+    --accent-vllm: #00e5a0;
+    --accent-sglang: #ff6b9d;
+    --accent-nim: #5b8def;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a0;
+    --text-muted: #55556a;
+    --border: #2a2a3a;
+    --orange: #ff9f43;
+    --red: #ff4757;
+    --yellow: #ffd93d;
+    --grid-line: rgba(255,255,255,0.04);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .noise-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    padding: 80px 0;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(0,229,160,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(91,141,239,0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent-vllm);
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hero-badge::before {
+    content: '';
+    width: 40px; height: 1px;
+    background: var(--accent-vllm);
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 6vw, 80px);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards 0.4s;
+  }
+
+  .hero h1 .highlight-green { color: var(--accent-vllm); }
+  .hero h1 .highlight-pink { color: var(--accent-sglang); }
+  .hero h1 .highlight-blue { color: var(--accent-nim); }
+
+  .hero-sub {
+    font-size: 18px;
+    color: var(--text-secondary);
+    max-width: 600px;
+    line-height: 1.7;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards 0.6s;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 32px;
+    margin-top: 48px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards 0.8s;
+  }
+
+  .hero-meta-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .hero-meta-item span {
+    display: block;
+    font-size: 22px;
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+
+  /* SECTION HEADERS */
+  .section {
+    padding: 100px 0;
+    position: relative;
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 20px;
+    line-height: 1.15;
+  }
+
+  .section-desc {
+    color: var(--text-secondary);
+    max-width: 640px;
+    font-size: 16px;
+    line-height: 1.7;
+    margin-bottom: 48px;
+  }
+
+  /* ENGINE CARDS */
+  .engine-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin-bottom: 60px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .engine-card {
+    background: var(--bg-card);
+    padding: 40px 32px;
+    position: relative;
+    transition: background 0.3s ease;
+  }
+
+  .engine-card:hover { background: var(--bg-card-hover); }
+
+  .engine-card .engine-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .engine-card.vllm .engine-icon { background: rgba(0,229,160,0.12); color: var(--accent-vllm); }
+  .engine-card.sglang .engine-icon { background: rgba(255,107,157,0.12); color: var(--accent-sglang); }
+  .engine-card.nim .engine-icon { background: rgba(91,141,239,0.12); color: var(--accent-nim); }
+
+  .engine-card h3 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+
+  .engine-card .engine-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  .engine-card.vllm .engine-tag { background: rgba(0,229,160,0.1); color: var(--accent-vllm); }
+  .engine-card.sglang .engine-tag { background: rgba(255,107,157,0.1); color: var(--accent-sglang); }
+  .engine-card.nim .engine-tag { background: rgba(91,141,239,0.1); color: var(--accent-nim); }
+
+  .engine-card p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .engine-card .engine-verdict {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .engine-card.vllm .engine-verdict { color: var(--accent-vllm); }
+  .engine-card.sglang .engine-verdict { color: var(--accent-sglang); }
+  .engine-card.nim .engine-verdict { color: var(--accent-nim); }
+
+  /* HARDWARE STRIP */
+  .hw-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    background: var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 60px;
+  }
+
+  .hw-item {
+    background: var(--bg-card);
+    padding: 28px 24px;
+    text-align: center;
+  }
+
+  .hw-item .hw-val {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+
+  .hw-item .hw-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* MODEL TABLE */
+  .model-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 60px;
+  }
+
+  .model-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .model-table td {
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 14px;
+  }
+
+  .model-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .model-table .model-name {
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .model-table .model-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+
+  .type-dense { background: rgba(255,159,67,0.12); color: var(--orange); }
+  .type-moe { background: rgba(91,141,239,0.12); color: var(--accent-nim); }
+
+  .model-table .precision {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* HEATMAP */
+  .heatmap-container {
+    overflow-x: auto;
+    margin-bottom: 40px;
+  }
+
+  .heatmap {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+  }
+
+  .heatmap th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    text-align: center;
+  }
+
+  .heatmap th:first-child { text-align: left; }
+
+  .heatmap td {
+    padding: 0;
+    text-align: center;
+    height: 64px;
+    font-weight: 700;
+    font-size: 16px;
+    position: relative;
+    border: 2px solid var(--bg-primary);
+  }
+
+  .heatmap .row-label {
+    text-align: left;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    font-weight: 600;
+    font-size: 14px;
+    min-width: 100px;
+    border: none;
+  }
+
+  .heat-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 16px;
+    border-radius: 4px;
+  }
+
+  .heat-100 { background: rgba(0,229,160,0.25); color: var(--accent-vllm); }
+  .heat-90 { background: rgba(0,229,160,0.18); color: #80f0c8; }
+  .heat-80 { background: rgba(255,217,61,0.15); color: var(--yellow); }
+  .heat-70 { background: rgba(255,217,61,0.12); color: #e8c840; }
+  .heat-60 { background: rgba(255,159,67,0.15); color: var(--orange); }
+  .heat-30 { background: rgba(255,71,87,0.18); color: var(--red); }
+  .heat-20 { background: rgba(255,71,87,0.25); color: var(--red); }
+
+  /* SCENARIO CARDS */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 60px;
+  }
+
+  .scenario-card {
+    background: var(--bg-card);
+    padding: 28px 24px;
+    position: relative;
+  }
+
+  .scenario-card .sc-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .scenario-card h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.2px;
+  }
+
+  .scenario-card p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  /* METRICS THRESHOLDS */
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 60px;
+  }
+
+  .metric-item {
+    background: var(--bg-card);
+    padding: 36px 28px;
+    text-align: center;
+  }
+
+  .metric-item .metric-val {
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+    color: var(--accent-vllm);
+  }
+
+  .metric-item .metric-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .metric-item .metric-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  /* BAR CHARTS */
+  .chart-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+
+  .chart-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .bar-chart {
+    margin-bottom: 48px;
+  }
+
+  .bar-group {
+    margin-bottom: 24px;
+  }
+
+  .bar-group-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .bar-label {
+    width: 70px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 28px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(0,0,0,0.7);
+    transition: width 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    min-width: fit-content;
+    padding-right: 8px;
+  }
+
+  .bar-fill.vllm { background: var(--accent-vllm); }
+  .bar-fill.sglang { background: var(--accent-sglang); }
+  .bar-fill.nim { background: var(--accent-nim); }
+
+  /* JITTER */
+  .jitter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .jitter-card {
+    background: var(--bg-card);
+    padding: 28px 24px;
+    text-align: center;
+  }
+
+  .jitter-card .jitter-engine {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .jitter-card.vllm .jitter-engine { color: var(--accent-vllm); }
+  .jitter-card.sglang .jitter-engine { color: var(--accent-sglang); }
+  .jitter-card.nim .jitter-engine { color: var(--accent-nim); }
+
+  .jitter-card .jitter-val {
+    font-size: 40px;
+    font-weight: 900;
+    letter-spacing: -2px;
+    margin-bottom: 4px;
+  }
+
+  .jitter-card .jitter-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .jitter-scale {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 8px;
+    margin-bottom: 60px;
+  }
+
+  .jitter-scale span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  /* VERDICT */
+  .verdict-section {
+    background: var(--bg-card);
+    border-radius: 20px;
+    padding: 64px;
+    margin-bottom: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .verdict-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-vllm), var(--accent-sglang), var(--accent-nim));
+  }
+
+  .verdict-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+    margin-top: 40px;
+  }
+
+  .verdict-item {
+    position: relative;
+  }
+
+  .verdict-item .verdict-rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 64px;
+    font-weight: 700;
+    position: absolute;
+    top: -10px;
+    right: 0;
+    opacity: 0.06;
+  }
+
+  .verdict-item h4 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .verdict-item .verdict-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  .verdict-item.v-vllm .verdict-pct { color: var(--accent-vllm); }
+  .verdict-item.v-sglang .verdict-pct { color: var(--accent-sglang); }
+  .verdict-item.v-nim .verdict-pct { color: var(--accent-nim); }
+
+  .verdict-item p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* TAKEAWAY */
+  .takeaway-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 60px;
+  }
+
+  .takeaway-card {
+    background: var(--bg-card);
+    padding: 32px 28px;
+  }
+
+  .takeaway-card .tk-icon {
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+
+  .takeaway-card h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.2px;
+  }
+
+  .takeaway-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+
+  .legend-dot.vllm { background: var(--accent-vllm); }
+  .legend-dot.sglang { background: var(--accent-sglang); }
+  .legend-dot.nim { background: var(--accent-nim); }
+
+  /* FOOTER */
+  .footer {
+    padding: 60px 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .footer p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  .footer a {
+    color: var(--accent-vllm);
+    text-decoration: none;
+  }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* WINNER BADGE */
+  .winner-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,229,160,0.1);
+    color: var(--accent-vllm);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,229,160,0.2);
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.7s ease forwards;
+  }
+
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+  .delay-4 { animation-delay: 0.4s; }
+
+  /* SCALING NOTE */
+  .scaling-block {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 60px;
+    border-left: 3px solid var(--orange);
+  }
+
+  .scaling-block h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--orange);
+  }
+
+  .scaling-block p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .container { padding: 0 20px; }
+    .engine-grid, .scenario-grid, .metric-row, .jitter-grid, .verdict-grid { grid-template-columns: 1fr; }
+    .hw-strip { grid-template-columns: repeat(2, 1fr); }
+    .takeaway-grid { grid-template-columns: 1fr; }
+    .verdict-section { padding: 40px 24px; }
+    .hero-meta { flex-direction: column; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+
+<div class="container">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">iX Magazin · Benchmark 2026</div>
+    <h1>
+      Inferenz-Engines<br>
+      <span class="highlight-green">vLLM</span> ·
+      <span class="highlight-pink">SGLang</span> ·
+      <span class="highlight-blue">NIM</span>
+    </h1>
+    <p class="hero-sub">
+      Ein praxisnaher Benchmark vergleicht die drei führenden Inferenz-Engines für große Sprachmodelle auf einer Nvidia H200 GPU. Durchsatz, Latenz, Stabilität — alle Ergebnisse auf einen Blick.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item"><span>4</span>Modelle getestet</div>
+      <div class="hero-meta-item"><span>6</span>Testszenarien</div>
+      <div class="hero-meta-item"><span>12</span>Konfigurationen</div>
+      <div class="hero-meta-item"><span>~213 €</span>Gesamtkosten</div>
+    </div>
+  </section>
+
+  <!-- THE THREE ENGINES -->
+  <section class="section">
+    <div class="section-label">Die Kandidaten</div>
+    <div class="section-title">Drei Engines, ein Ziel</div>
+    <div class="section-desc">Jede Engine verfolgt einen eigenen Ansatz bei Scheduling, Speicherverwaltung und Optimierung. Der Benchmark testet sie unter identischen Bedingungen.</div>
+
+    <div class="engine-grid">
+      <div class="engine-card vllm">
+        <div class="engine-icon">vL</div>
+        <h3>vLLM</h3>
+        <div class="engine-tag">Open Source · v0.12.0</div>
+        <p>Referenz-Engine mit PagedAttention für speichereffizientes KV-Cache-Management. Robustes Scheduling und stabile Performance über diverse Workloads.</p>
+        <div class="engine-verdict">★ BENCHMARK-SIEGER — Höchster Durchsatz, beste Stabilität</div>
+      </div>
+      <div class="engine-card sglang">
+        <div class="engine-icon">SG</div>
+        <h3>SGLang</h3>
+        <div class="engine-tag">Open Source · v0.5.5</div>
+        <p>Optimiert für wiederkehrende Workload-Strukturen. RadixAttention ermöglicht effizientes Caching gemeinsamer Promptpräfixe — theoretisch ideal für Agenten & RAG.</p>
+        <div class="engine-verdict">△ NUR 8% DER VERGLEICHE VORN</div>
+      </div>
+      <div class="engine-card nim">
+        <div class="engine-icon">NI</div>
+        <h3>NVIDIA NIM</h3>
+        <div class="engine-tag">Enterprise · TensorRT-LLM</div>
+        <p>Vorkonfigurierte Enterprise-Laufzeitumgebung. Nutzt je nach Modell TensorRT-LLM oder bestehende Engines wie vLLM/SGLang als Backend.</p>
+        <div class="engine-verdict">◇ PUNKTUELLE STÄRKEN IN EXTREMFÄLLEN</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HARDWARE -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Testumgebung</div>
+    <div class="section-title">Hardware & Setup</div>
+    <div class="section-desc">Alle Benchmarks liefen auf einer einzelnen Nvidia H200-SXM-GPU (RunPod), um Scheduling und KV-Cache-Management isoliert bewerten zu können.</div>
+
+    <div class="hw-strip">
+      <div class="hw-item">
+        <div class="hw-val">H200 SXM</div>
+        <div class="hw-label">GPU</div>
+      </div>
+      <div class="hw-item">
+        <div class="hw-val">141 GB</div>
+        <div class="hw-label">HBM3e Speicher</div>
+      </div>
+      <div class="hw-item">
+        <div class="hw-val">0.9</div>
+        <div class="hw-label">GPU Memory Utilization</div>
+      </div>
+      <div class="hw-item">
+        <div class="hw-val">256</div>
+        <div class="hw-label">Max Num Seqs</div>
+      </div>
+    </div>
+
+    <!-- MODELS TABLE -->
+    <div class="chart-title">Getestete Modelle</div>
+    <div class="chart-subtitle">Dense- und Mixture-of-Experts-Modelle verschiedener Größen</div>
+    <table class="model-table">
+      <thead>
+        <tr>
+          <th>Modell</th>
+          <th>Typ</th>
+          <th>Größe</th>
+          <th>Präzision</th>
+          <th>Kategorie</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="model-name">DeepSeek-R1-Distill-Qwen-32B</td>
+          <td><span class="model-type type-dense">Dense</span></td>
+          <td>62 GB</td>
+          <td class="precision">BF16</td>
+          <td style="color: var(--text-secondary)">Dense-Small</td>
+        </tr>
+        <tr>
+          <td class="model-name">Llama-3.3-70B-Instruct</td>
+          <td><span class="model-type type-dense">Dense</span></td>
+          <td>68 GB</td>
+          <td class="precision">FP8</td>
+          <td style="color: var(--text-secondary)">Dense-Large</td>
+        </tr>
+        <tr>
+          <td class="model-name">Mixtral-8×7B-Instruct</td>
+          <td><span class="model-type type-moe">MoE</span></td>
+          <td>87 GB</td>
+          <td class="precision">BF16</td>
+          <td style="color: var(--text-secondary)">Sparse-Small</td>
+        </tr>
+        <tr>
+          <td class="model-name">gpt-oss-120b</td>
+          <td><span class="model-type type-moe">MoE</span></td>
+          <td>67 GB</td>
+          <td class="precision">MXFP4</td>
+          <td style="color: var(--text-secondary)">Sparse-Large</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SCENARIOS -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Testszenarien</div>
+    <div class="section-title">6 Szenarien, vom Best Case zum Worst Case</div>
+    <div class="section-desc">Von identischen kurzen Prompts bis hin zu langen diversen Eingaben ohne Caching-Vorteil — die Szenarien decken realistische Produktionsmuster ab.</div>
+
+    <div class="scenario-grid">
+      <div class="scenario-card">
+        <div class="sc-id">A1</div>
+        <h4>Gleicher Prompt, kurz</h4>
+        <p>~50 Token. Identischer Prompt. Maximales Prefix-Caching. Referenz-Szenario für Bestleistung.</p>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-id">A2</div>
+        <h4>Gleicher Prompt, lang</h4>
+        <p>~2.500 Token. Identischer Prompt. Kombiniert Prefix-Caching mit langer Prefill-Phase.</p>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-id">B1</div>
+        <h4>Diverse Prompts, kurz</h4>
+        <p>~50 Token. Verschiedene Prompts. Testet reinen Decode-Durchsatz ohne Caching-Vorteil.</p>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-id">B2</div>
+        <h4>Diverse Prompts, lang</h4>
+        <p>~2.500 Token. Verschiedene Prompts. Härteste Workload — Prefill ohne Caching dominiert.</p>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-id">C</div>
+        <h4>RAG / Agent</h4>
+        <p>~1.500 Token Systemprompt + kurze variable Queries. Simuliert typische RAG-Anwendungen.</p>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-id">D</div>
+        <h4>Mehrstufiger Dialog</h4>
+        <p>Wachsende Konversationshistorie. Simuliert Chat-Anwendungen mit inkrementellem Prefix-Caching.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- METRICS -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Zielwerte</div>
+    <div class="section-title">Richtwerte für Chat-Workloads</div>
+
+    <div class="metric-row">
+      <div class="metric-item">
+        <div class="metric-val">&lt; 500 ms</div>
+        <div class="metric-name">Time to First Token</div>
+        <div class="metric-desc">Verzögerungen unter 500ms werden als reaktionsschnell wahrgenommen. Ab ~1s entsteht spürbare Wartezeit.</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">&gt; 15 tok/s</div>
+        <div class="metric-name">Tokenrate</div>
+        <div class="metric-desc">Menschliche Lesegeschwindigkeit: ~5 tok/s. 15–30 tok/s ermöglichen flüssiges Streaming. TTS/Code: 50–80 tok/s.</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">&lt; 100 ms</div>
+        <div class="metric-name">ITL p99</div>
+        <div class="metric-desc">Gleichmäßige Tokenabstände verhindern ruckelnde Ausgabe. Stärkere Spikes sind visuell wahrnehmbar.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKLOAD HEATMAP -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Kernergebnis</div>
+    <div class="section-title">Relative Performance zu A1 <span style="font-weight:400; font-size: 0.5em; color: var(--text-muted);">Batch 128</span></div>
+    <div class="section-desc">Wie stark bremsen komplexe Workloads die Engines aus? A1 = 100% (Best Case). B2 ist die härteste Herausforderung.</div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot vllm"></div>vLLM</div>
+      <div class="legend-item"><div class="legend-dot sglang"></div>SGLang</div>
+      <div class="legend-item"><div class="legend-dot nim"></div>NIM</div>
+    </div>
+
+    <div class="heatmap-container">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th></th>
+            <th>A1</th>
+            <th>A2</th>
+            <th>B1</th>
+            <th>B2</th>
+            <th>C</th>
+            <th>D</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-label" style="color: var(--accent-vllm);">vLLM</td>
+            <td><div class="heat-cell heat-100">100%</div></td>
+            <td><div class="heat-cell heat-90">94%</div></td>
+            <td><div class="heat-cell heat-100">99%</div></td>
+            <td><div class="heat-cell heat-20">23%</div></td>
+            <td><div class="heat-cell heat-80">89%</div></td>
+            <td><div class="heat-cell heat-80">82%</div></td>
+          </tr>
+          <tr>
+            <td class="row-label" style="color: var(--accent-sglang);">SGLang</td>
+            <td><div class="heat-cell heat-100">100%</div></td>
+            <td><div class="heat-cell heat-70">72%</div></td>
+            <td><div class="heat-cell heat-90">90%</div></td>
+            <td><div class="heat-cell heat-20">25%</div></td>
+            <td><div class="heat-cell heat-60">67%</div></td>
+            <td><div class="heat-cell heat-70">76%</div></td>
+          </tr>
+          <tr>
+            <td class="row-label" style="color: var(--accent-nim);">NIM</td>
+            <td><div class="heat-cell heat-100">100%</div></td>
+            <td><div class="heat-cell heat-30">35%</div></td>
+            <td><div class="heat-cell heat-100">99%</div></td>
+            <td><div class="heat-cell heat-20">24%</div></td>
+            <td><div class="heat-cell heat-30">37%</div></td>
+            <td><div class="heat-cell heat-80">83%</div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: 12px; color: var(--text-muted); margin-top: 12px; font-family: 'JetBrains Mono', monospace;">
+      ↑ vLLM behält über alle Szenarien die geringsten Performance-Einbußen. NIM verliert bei A2 und C am stärksten.
+    </p>
+  </section>
+
+  <!-- THROUGHPUT COMPARISON -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Durchsatz</div>
+    <div class="section-title">Server-Durchsatz bei Batch 256</div>
+    <div class="section-desc">Aggregierter Serverdurchsatz in tok/s — der zentrale Leistungsindikator für Batch-Workloads.</div>
+
+    <div class="legend" style="margin-bottom: 32px;">
+      <div class="legend-item"><div class="legend-dot vllm"></div>vLLM</div>
+      <div class="legend-item"><div class="legend-dot sglang"></div>SGLang</div>
+      <div class="legend-item"><div class="legend-dot nim"></div>NIM</div>
+    </div>
+
+    <!-- A1 Best Case -->
+    <div class="bar-chart">
+      <div class="chart-title">Szenario A1 — Best Case (gleicher kurzer Prompt)</div>
+      <div class="chart-subtitle">Batch 256 · tok/s</div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-moe" style="font-size:9px">MoE</span> gpt-oss-120b</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 96%">7455</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 93%">7354</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 77%">5972</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-moe" style="font-size:9px">MoE</span> Mixtral 8×7B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 99%">7706</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 82%">6455</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 92%">7255</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-dense" style="font-size:9px">Dense</span> Qwen 2.5 32B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 81%">6389</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 69%">5452</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 76%">6098</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-dense" style="font-size:9px">Dense</span> Llama 3.3 70B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 58%">4553</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 45%">3614</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 27%">2135</div></div></div>
+      </div>
+    </div>
+
+    <!-- B2 Worst Case -->
+    <div class="bar-chart">
+      <div class="chart-title">Szenario B2 — Worst Case (diverse lange Prompts)</div>
+      <div class="chart-subtitle">Batch 256 · tok/s</div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-moe" style="font-size:9px">MoE</span> gpt-oss-120b</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 90%">2794</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 66%">2068</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 64%">1989</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-moe" style="font-size:9px">MoE</span> Mixtral 8×7B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 22%">675</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 21%">643</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 19%">595</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-dense" style="font-size:9px">Dense</span> Qwen 2.5 32B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 33%">1054</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 32%">1032</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 33%">1038</div></div></div>
+      </div>
+
+      <div class="bar-group">
+        <div class="bar-group-label"><span class="model-type type-dense" style="font-size:9px">Dense</span> Llama 3.3 70B</div>
+        <div class="bar-row"><div class="bar-label">vLLM</div><div class="bar-track"><div class="bar-fill vllm" style="width: 12%">368</div></div></div>
+        <div class="bar-row"><div class="bar-label">SGLang</div><div class="bar-track"><div class="bar-fill sglang" style="width: 6%">199</div></div></div>
+        <div class="bar-row"><div class="bar-label">NIM</div><div class="bar-track"><div class="bar-fill nim" style="width: 20%">611</div></div></div>
+      </div>
+    </div>
+
+    <div class="scaling-block">
+      <h4>⚡ Überraschung: Skalierung bei hohen Batchgrößen</h4>
+      <p>In der Praxis dominieren oft konservative Batchgrößen von 8–10. Der Benchmark zeigt jedoch, dass der Serverdurchsatz häufig bis Batch 256 weiter steigt — bei gpt-oss-120b etwa +116% von Batch 64 auf 256 (vLLM, Szenario A1). Doch der höhere Durchsatz erkauft sich Stabilitätsprobleme: Bei Batch 128+ traten vor allem bei Llama 70B Verbindungsabbrüche auf. vLLM zeigte hier die höchste Stabilität.</p>
+    </div>
+  </section>
+
+  <!-- JITTER / STREAMING QUALITY -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Streaming-Qualität</div>
+    <div class="section-title">Jitter-Rate (P99/P50 ITL)</div>
+    <div class="section-desc">Wert nahe 1.0 = gleichmäßiger Textfluss. Über 2.0 = spürbare Unregelmäßigkeiten. Der Wert misst, wie ruckelfrei das Token-Streaming beim Endnutzer ankommt.</div>
+
+    <div class="jitter-grid">
+      <div class="jitter-card vllm">
+        <div class="jitter-engine">vLLM</div>
+        <div class="jitter-val" style="color: var(--accent-vllm);">1.5–3.5</div>
+        <div class="jitter-sub">Konsistentestes Streaming</div>
+      </div>
+      <div class="jitter-card sglang">
+        <div class="jitter-engine">SGLang</div>
+        <div class="jitter-val" style="color: var(--accent-sglang);">1.5–9.0</div>
+        <div class="jitter-sub">Instabil bei hoher Last (>64 User)</div>
+      </div>
+      <div class="jitter-card nim">
+        <div class="jitter-engine">NIM</div>
+        <div class="jitter-val" style="color: var(--accent-nim);">2.0–6.0*</div>
+        <div class="jitter-sub">Burst-Auslieferung bei Llama 70B</div>
+      </div>
+    </div>
+    <div class="jitter-scale">
+      <span>← Gleichmäßig (1.0)</span>
+      <span style="color: var(--red);">Ruckelnd (9.0+) →</span>
+    </div>
+
+    <div class="scaling-block" style="border-left-color: var(--accent-nim);">
+      <h4>NIM-Anomalie bei Llama 3.3 70B</h4>
+      <p>Bei kurzen Prompts (A1, B1, D) zeigt NIM extrem niedrige P50-Werte (~0,01 ms) bei P99-Werten im Sekundenbereich. Dies deutet auf gebündelte Token-Auslieferung in Bursts hin, nicht auf unregelmäßiges Streaming. Für TTS, Dialogsysteme oder Live-Untertitel kann dies problematisch sein.</p>
+    </div>
+  </section>
+
+  <!-- VERDICT -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Ergebnis</div>
+    <div class="section-title">Das Fazit</div>
+
+    <div class="verdict-section">
+      <div class="winner-badge">✦ Gesamtsieger: vLLM</div>
+      <p style="font-size: 20px; font-weight: 600; margin-top: 20px; line-height: 1.5; max-width: 800px;">
+        vLLM dominiert den Vergleich mit dem höchsten Durchsatz, der besten Skalierung unter Last und dem konsistentesten Streamingverhalten.
+      </p>
+
+      <div class="verdict-grid">
+        <div class="verdict-item v-vllm">
+          <div class="verdict-rank">#1</div>
+          <h4 style="color: var(--accent-vllm);">vLLM</h4>
+          <div class="verdict-pct">Dominiert die Mehrheit der Vergleiche</div>
+          <p>Höchster Serverdurchsatz in fast allen Konfigurationen. Stabilste Verbindungen bei hoher Last. Niedrigste Jitter-Rate (1.5–3.5). Standardwahl für den Produktionsbetrieb.</p>
+        </div>
+        <div class="verdict-item v-sglang">
+          <div class="verdict-rank">#2</div>
+          <h4 style="color: var(--accent-sglang);">SGLang</h4>
+          <div class="verdict-pct">In nur 8% der Vergleiche vorn</div>
+          <p>Theoretische Radix-/Prefix-Caching-Vorteile kaum belegt. vLLM hat offenbar aufgeholt. Vereinzelte Stärken bei gpt-oss-120b und Mixtral unter geringer Last.</p>
+        </div>
+        <div class="verdict-item v-nim">
+          <div class="verdict-rank">#3</div>
+          <h4 style="color: var(--accent-nim);">NIM</h4>
+          <div class="verdict-pct">Punktuell stark in Extremfällen</div>
+          <p>Größte Durchsatzgewinne nur in Grenzfällen (Llama 70B, B2, hohe Batch). Nutzt teils vLLM als Backend. Vorsprünge eher durch aggressive HW-Konfiguration als durch überlegene Engine.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KEY TAKEAWAYS -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-label">Kernaussagen</div>
+    <div class="section-title">Die wichtigsten Erkenntnisse</div>
+
+    <div class="takeaway-grid">
+      <div class="takeaway-card">
+        <div class="tk-icon">🏆</div>
+        <h4>vLLM als sichere Standardwahl</h4>
+        <p>Höchster Durchsatz, beste Stabilität, niedrigster Jitter. Für produktive Mehrbenutzersysteme aktuell die beste Wahl.</p>
+      </div>
+      <div class="takeaway-card">
+        <div class="tk-icon">📊</div>
+        <h4>MoE-Modelle skalieren besser</h4>
+        <p>Mixture-of-Experts-Modelle skalieren bei hoher Batchgröße weiter, während dichte Modelle (Llama 70B) früher ein Plateau erreichen.</p>
+      </div>
+      <div class="takeaway-card">
+        <div class="tk-icon">⚙️</div>
+        <h4>Batch-Potenzial wird verschenkt</h4>
+        <p>In der Praxis oft nur Batch 8–10, aber der Durchsatz steigt häufig bis Batch 256. Bei kleinen Batches bleibt GPU-Kapazität ungenutzt.</p>
+      </div>
+      <div class="takeaway-card">
+        <div class="tk-icon">🔄</div>
+        <h4>Caching bestimmt die Performance</h4>
+        <p>Nicht nur die Promptlänge, sondern die Wiederverwendbarkeit des Präfixes bestimmt den Durchsatz. A2 (identisch) > C (teil-identisch) > B2 (divers).</p>
+      </div>
+      <div class="takeaway-card">
+        <div class="tk-icon">📉</div>
+        <h4>SGLang enttäuscht</h4>
+        <p>Die propagierten Vorteile durch RadixAttention sind in der Praxis kaum messbar. vLLM hat in diesem Bereich offenbar aufgeholt.</p>
+      </div>
+      <div class="takeaway-card">
+        <div class="tk-icon">⚠️</div>
+        <h4>Stabilität vs. Durchsatz</h4>
+        <p>Hohe Batchgrößen maximieren den GPU-Durchsatz, bringen aber Verbindungsabbrüche. In Chat-Systemen wiegt jeder Fehler schwer.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>Basierend auf dem Artikel von Danny Gerst · iX Magazin · 17.03.2026</p>
+    <p style="margin-top: 8px;">Benchmarkdaten & Skripte: <a href="https://github.com/bizrockman/AIInferenceBenchmark" target="_blank">github.com/bizrockman/AIInferenceBenchmark</a></p>
+  </footer>
+
+</div>
+
+</body>
+</html>
